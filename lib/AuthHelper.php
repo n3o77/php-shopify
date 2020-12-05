@@ -38,7 +38,7 @@ class AuthHelper
      *
      * @param array $data Data array
      *
-     * @return array
+     * @return string
      */
     public static function buildQueryString($data)
     {
@@ -46,25 +46,28 @@ class AuthHelper
         foreach ($data as $key => $value) {
             $paramStrings[] = "$key=$value";
         }
-        return join('&', $paramStrings);
+        return implode('&', $paramStrings);
     }
 
     /**
      * Verify if the request is made from shopify using hmac hash value
      *
+     * @param ShopifySDK $shopifySdk
+     *
      * @throws SdkException if SharedSecret is not provided or hmac is not found in the url parameters
      *
      * @return bool
      */
-    public static function verifyShopifyRequest()
+    public static function verifyShopifyRequest($shopifySdk)
     {
         $data = $_GET;
+        $config = $shopifySdk->getConfig();
 
-        if(!isset(ShopifySDK::$config['SharedSecret'])) {
+        if(!isset($config['SharedSecret'])) {
             throw new SdkException("Please provide SharedSecret while configuring the SDK client.");
         }
 
-        $sharedSecret = ShopifySDK::$config['SharedSecret'];
+        $sharedSecret = $config['SharedSecret'];
 
         //Get the hmac and remove it from array
         if (isset($data['hmac'])) {
@@ -85,9 +88,9 @@ class AuthHelper
         //hash the values before comparing (to prevent time attack)
         if(md5($realHmac) === md5($hmac)) {
             return true;
-        } else {
-            return false;
         }
+
+        return false;
     }
 
     /**
@@ -95,6 +98,7 @@ class AuthHelper
      *
      * @see https://help.shopify.com/api/guides/authentication/oauth#scopes For allowed scopes
      *
+     * @param ShopifySDK $shopifySdk
      * @param string|string[] $scopes Scopes required by app
      * @param string $redirectUrl
      * @param string $state
@@ -104,9 +108,9 @@ class AuthHelper
      *
      * @return void|string
      */
-    public static function createAuthRequest($scopes, $redirectUrl = null, $state = null, $options = null, $return = false)
+    public static function createAuthRequest($shopifySdk, $scopes, $redirectUrl = null, $state = null, $options = null, $return = false)
     {
-        $config = ShopifySDK::$config;
+        $config = $shopifySdk->getConfig();
 
         if(!isset($config['ShopUrl']) || !isset($config['ApiKey'])) {
             throw new SdkException("ShopUrl and ApiKey are required for authentication request. Please check SDK configuration!");
@@ -119,10 +123,10 @@ class AuthHelper
 
             //If redirect url is the same as this url, then need to check for access token when redirected back from shopify
             if(isset($_GET['code'])) {
-                return self::getAccessToken($config);
-            } else {
-                $redirectUrl = self::getCurrentUrl();
+                return self::getAccessToken($shopifySdk);
             }
+
+            $redirectUrl = self::getCurrentUrl();
         }
 
         if (is_array($scopes)) {
@@ -149,13 +153,15 @@ class AuthHelper
      * Get Access token for the API
      * Call this when being redirected from shopify page ( to the $redirectUrl) after authentication
      *
+     * @param ShopifySDK $shopifySdk
+     *
      * @throws SdkException if SharedSecret or ApiKey is missing in SDK configuration or request is not valid
      *
      * @return string
      */
-    public static function getAccessToken()
+    public static function getAccessToken($shopifySdk)
     {
-        $config = ShopifySDK::$config;
+        $config = $shopifySdk->getConfig();
 
         if(!isset($config['SharedSecret']) || !isset($config['ApiKey'])) {
             throw new SdkException("SharedSecret and ApiKey are required for getting access token. Please check SDK configuration!");
@@ -171,8 +177,8 @@ class AuthHelper
             $response = HttpRequestJson::post($config['AdminUrl'] . 'oauth/access_token', $data);
 
             return isset($response['access_token']) ? $response['access_token'] : null;
-        } else {
-            throw new SdkException("This request is not initiated from a valid shopify shop!");
         }
+
+        throw new SdkException("This request is not initiated from a valid shopify shop!");
     }
 }

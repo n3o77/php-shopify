@@ -25,8 +25,8 @@ class TestResource extends \PHPUnit_Framework_TestCase
             'Password' => getenv('SHOPIFY_API_PASSWORD'), //Your Private API Password
         );
 
-        self::$shopify = ShopifySDK::config($config);
-        ShopifySDK::checkApiCallLimit();
+        self::$shopify = new ShopifySDK($config);
+        self::$shopify->checkApiCallLimit();
     }
 
     /**
